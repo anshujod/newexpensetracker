@@ -99,7 +99,7 @@ export const insertRecurringTransactionSchema = createInsertSchema(recurringTran
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type User = typeof users.$inferSelect; // Removed incorrect '& { id: string }' override
 
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type Category = typeof categories.$inferSelect;

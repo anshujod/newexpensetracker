@@ -1,6 +1,17 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+// import { setupVite, serveStatic, log } from "./vite"; // Commented out unused import
+
+// Simple logger function
+const log = (message: string, source = "express") => {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+  console.log(`${formattedTime} [${source}] ${message}`);
+};
 
 const app = express();
 app.use(express.json());
@@ -50,13 +61,13 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+  // if (app.get("env") === "development") {
+    // await setupVite(app, server); // Commented out as frontend is served separately
+  // } else {
+    // serveStatic(app); // Commented out as frontend is served separately
+  // }
 
-  const PORT = process.env.PORT || 5000;
+  const PORT = process.env.PORT || 5001; // Changed default port to 5001
   server.listen({
     port: PORT,
     host: "0.0.0.0",

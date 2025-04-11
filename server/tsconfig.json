@@ -14,7 +14,8 @@
     "baseUrl": ".",
     "paths": {
       "@shared/*": ["../shared/*"]
-    }
+    },
+    "allowJs": true
   },
   "include": ["**/*"],
   "exclude": ["node_modules", "dist"]

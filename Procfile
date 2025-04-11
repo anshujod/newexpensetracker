@@ -1,1 +1,2 @@
-web: cd server && npm install && npx tsc && node dist/index.js
+web: npm install && npm run build && npm start
+client: npm install && npm run build && npm run preview
