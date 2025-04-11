@@ -7,16 +7,16 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "outDir": "dist",
-    "rootDir": ".",
+    "outDir": "dist", // Output will be relative to tsconfig location, inside 'dist'
+    "rootDir": "..", // Root is the parent directory (project root)
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "baseUrl": ".",
+    "baseUrl": "..", // Base URL is now the project root
     "paths": {
-      "@shared/*": ["../shared/*"]
+      "@shared/*": ["shared/*"] // Path relative to baseUrl
     },
     "allowJs": true
   },
-  "include": ["**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["server/**/*", "shared/**/*"], // Include both server and shared
+  "exclude": ["node_modules", "dist", "server/vite.ts"] // Exclude vite integration file
 }
