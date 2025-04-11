@@ -4,9 +4,10 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { 
   insertTransactionSchema, 
-  insertCategorySchema, 
+  insertCategorySchema,
   insertBudgetSchema,
-  insertRecurringTransactionSchema
+  insertRecurringTransactionSchema,
+  User // Import the User type
 } from "@shared/schema";
 import { z } from "zod";
 import { format } from 'date-fns';
@@ -18,8 +19,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all user transactions
   app.get("/api/transactions", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    
-    const userId = req.user!.id;
+
+    const userId = (req.user as User).id; // Cast req.user to User
     const transactions = await storage.getTransactions(userId);
     res.json(transactions);
   });
@@ -33,20 +34,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const transaction = await storage.getTransactionById(transactionId);
     if (!transaction) return res.status(404).json({ message: "Transaction not found" });
-    
+
     // Check if transaction belongs to requesting user
-    if (transaction.userId !== req.user!.id) 
+    if (transaction.userId !== (req.user as User).id) // Cast req.user to User
       return res.status(403).json({ message: "Access denied" });
-    
+
     res.json(transaction);
   });
   
   // Create new transaction
   app.post("/api/transactions", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    
+
     try {
-      const userId = req.user!.id;
+      const userId = (req.user as User).id; // Cast req.user to User
       const transactionData = insertTransactionSchema.parse({
         ...req.body,
         userId
@@ -77,11 +78,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const transaction = await storage.getTransactionById(transactionId);
     if (!transaction) return res.status(404).json({ message: "Transaction not found" });
-    
+
     // Check if transaction belongs to requesting user
-    if (transaction.userId !== req.user!.id) 
+    if (transaction.userId !== (req.user as User).id) // Cast req.user to User
       return res.status(403).json({ message: "Access denied" });
-    
+
     try {
       // Parse and validate update data
       const updateFields = req.body;
@@ -90,10 +91,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updateFields.categoryId) {
         const category = await storage.getCategoryById(updateFields.categoryId);
         if (!category) return res.status(400).json({ message: "Invalid category" });
-        if (category.userId !== req.user!.id && category.userId !== 0) 
+        if (category.userId !== (req.user as User).id && category.userId !== 0) // Cast req.user to User
           return res.status(403).json({ message: "Access denied to this category" });
       }
-      
+
       const updatedTransaction = await storage.updateTransaction(transactionId, updateFields);
       res.json(updatedTransaction);
     } catch (error) {
@@ -113,11 +114,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const transaction = await storage.getTransactionById(transactionId);
     if (!transaction) return res.status(404).json({ message: "Transaction not found" });
-    
+
     // Check if transaction belongs to requesting user
-    if (transaction.userId !== req.user!.id) 
+    if (transaction.userId !== (req.user as User).id) // Cast req.user to User
       return res.status(403).json({ message: "Access denied" });
-    
+
     const success = await storage.deleteTransaction(transactionId);
     if (success) {
       res.status(204).send();
@@ -131,10 +132,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all user categories
   app.get("/api/categories", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    
-    const userId = req.user!.id;
+
+    const userId = (req.user as User).id; // Cast req.user to User
     const userCategories = await storage.getCategories(userId);
-    
+
     // Also get default categories (userId = 0)
     const defaultCategories = await storage.getCategories(0);
     
@@ -146,9 +147,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new category
   app.post("/api/categories", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    
+
     try {
-      const userId = req.user!.id;
+      const userId = (req.user as User).id; // Cast req.user to User
       const categoryData = insertCategorySchema.parse({
         ...req.body,
         userId
@@ -173,11 +174,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const category = await storage.getCategoryById(categoryId);
     if (!category) return res.status(404).json({ message: "Category not found" });
-    
+
     // Check if category belongs to requesting user
-    if (category.userId !== req.user!.id) 
+    if (category.userId !== (req.user as User).id) // Cast req.user to User
       return res.status(403).json({ message: "Access denied" });
-    
+
     try {
       const updateFields = req.body;
       const updatedCategory = await storage.updateCategory(categoryId, updateFields);
@@ -199,11 +200,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const category = await storage.getCategoryById(categoryId);
     if (!category) return res.status(404).json({ message: "Category not found" });
-    
+
     // Check if category belongs to requesting user
-    if (category.userId !== req.user!.id) 
+    if (category.userId !== (req.user as User).id) // Cast req.user to User
       return res.status(403).json({ message: "Access denied" });
-    
+
     const success = await storage.deleteCategory(categoryId);
     if (success) {
       res.status(204).send();
@@ -217,8 +218,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all user budgets
   app.get("/api/budgets", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    
-    const userId = req.user!.id;
+
+    const userId = (req.user as User).id; // Cast req.user to User
     const budgets = await storage.getBudgets(userId);
     res.json(budgets);
   });
@@ -226,9 +227,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new budget
   app.post("/api/budgets", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    
+
     try {
-      const userId = req.user!.id;
+      const userId = (req.user as User).id; // Cast req.user to User
       const budgetData = insertBudgetSchema.parse({
         ...req.body,
         userId
@@ -259,11 +260,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const budget = await storage.getBudgetById(budgetId);
     if (!budget) return res.status(404).json({ message: "Budget not found" });
-    
+
     // Check if budget belongs to requesting user
-    if (budget.userId !== req.user!.id) 
+    if (budget.userId !== (req.user as User).id) // Cast req.user to User
       return res.status(403).json({ message: "Access denied" });
-    
+
     try {
       const updateFields = req.body;
       
@@ -271,10 +272,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updateFields.categoryId) {
         const category = await storage.getCategoryById(updateFields.categoryId);
         if (!category) return res.status(400).json({ message: "Invalid category" });
-        if (category.userId !== req.user!.id && category.userId !== 0) 
+        if (category.userId !== (req.user as User).id && category.userId !== 0) // Cast req.user to User
           return res.status(403).json({ message: "Access denied to this category" });
       }
-      
+
       const updatedBudget = await storage.updateBudget(budgetId, updateFields);
       res.json(updatedBudget);
     } catch (error) {
@@ -294,11 +295,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const budget = await storage.getBudgetById(budgetId);
     if (!budget) return res.status(404).json({ message: "Budget not found" });
-    
+
     // Check if budget belongs to requesting user
-    if (budget.userId !== req.user!.id) 
+    if (budget.userId !== (req.user as User).id) // Cast req.user to User
       return res.status(403).json({ message: "Access denied" });
-    
+
     const success = await storage.deleteBudget(budgetId);
     if (success) {
       res.status(204).send();
@@ -310,10 +311,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Financial summary data
   app.get("/api/summary", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    
-    const userId = req.user!.id;
+
+    const userId = (req.user as User).id; // Cast req.user to User
     const transactions = await storage.getTransactions(userId);
-    
+
     // Calculate income, expenses, and balance
     const totalIncome = transactions
       .filter(t => t.type === 'income')
@@ -378,8 +379,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all user recurring transactions
   app.get("/api/recurring-transactions", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    
-    const userId = req.user!.id;
+
+    const userId = (req.user as User).id; // Cast req.user to User
     const recurringTransactions = await storage.getRecurringTransactions(userId);
     res.json(recurringTransactions);
   });
@@ -393,20 +394,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const recurringTransaction = await storage.getRecurringTransactionById(recurringTransactionId);
     if (!recurringTransaction) return res.status(404).json({ message: "Recurring transaction not found" });
-    
+
     // Check if recurring transaction belongs to requesting user
-    if (recurringTransaction.userId !== req.user!.id) 
+    if (recurringTransaction.userId !== (req.user as User).id) // Cast req.user to User
       return res.status(403).json({ message: "Access denied" });
-    
+
     res.json(recurringTransaction);
   });
   
   // Create new recurring transaction
   app.post("/api/recurring-transactions", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    
+
     try {
-      const userId = req.user!.id;
+      const userId = (req.user as User).id; // Cast req.user to User
       const recurringTransactionData = insertRecurringTransactionSchema.parse({
         ...req.body,
         userId
@@ -462,11 +463,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const recurringTransaction = await storage.getRecurringTransactionById(recurringTransactionId);
     if (!recurringTransaction) return res.status(404).json({ message: "Recurring transaction not found" });
-    
+
     // Check if recurring transaction belongs to requesting user
-    if (recurringTransaction.userId !== req.user!.id) 
+    if (recurringTransaction.userId !== (req.user as User).id) // Cast req.user to User
       return res.status(403).json({ message: "Access denied" });
-    
+
     try {
       // Parse and validate update data
       const updateFields = req.body;
@@ -475,10 +476,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updateFields.categoryId) {
         const category = await storage.getCategoryById(updateFields.categoryId);
         if (!category) return res.status(400).json({ message: "Invalid category" });
-        if (category.userId !== req.user!.id && category.userId !== 0) 
+        if (category.userId !== (req.user as User).id && category.userId !== 0) // Cast req.user to User
           return res.status(403).json({ message: "Access denied to this category" });
       }
-      
+
       // Validate frequency-specific fields if frequency is being updated
       if (updateFields.frequency) {
         switch (updateFields.frequency) {
@@ -520,11 +521,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const recurringTransaction = await storage.getRecurringTransactionById(recurringTransactionId);
     if (!recurringTransaction) return res.status(404).json({ message: "Recurring transaction not found" });
-    
+
     // Check if recurring transaction belongs to requesting user
-    if (recurringTransaction.userId !== req.user!.id) 
+    if (recurringTransaction.userId !== (req.user as User).id) // Cast req.user to User
       return res.status(403).json({ message: "Access denied" });
-    
+
     const success = await storage.deleteRecurringTransaction(recurringTransactionId);
     if (success) {
       res.status(204).send();
@@ -585,11 +586,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Export transactions as CSV
   app.get("/api/export/transactions", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    
+
     try {
-      const userId = req.user!.id;
+      const userId = (req.user as User).id; // Cast req.user to User
       const transactions = await storage.getTransactions(userId);
-      
+
       // Get category information for each transaction
       const transactionsWithCategories = await Promise.all(
         transactions.map(async transaction => {
@@ -621,11 +622,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Export monthly report as CSV
   app.get("/api/export/monthly-report", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    
+
     try {
-      const userId = req.user!.id;
+      const userId = (req.user as User).id; // Cast req.user to User
       const transactions = await storage.getTransactions(userId);
-      
+
       // Group by month and category
       const monthlyReport: any[] = [];
       const monthlyData: Record<string, {
@@ -707,11 +708,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Export yearly report as CSV
   app.get("/api/export/yearly-report", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    
+
     try {
-      const userId = req.user!.id;
+      const userId = (req.user as User).id; // Cast req.user to User
       const transactions = await storage.getTransactions(userId);
-      
+
       // Group by year
       const yearlyData: Record<number, {
         income: number,
