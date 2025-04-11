@@ -15,6 +15,7 @@
     }
   ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/server/index.ts" }
+    { "source": "/api/(.*)", "destination": "/server/index.ts" },
+    { "source": "/(.*)", "destination": "/client/dist/index.html" }
   ]
 }
