@@ -63,6 +63,7 @@ export function Sidebar() {
   const navigationItems = [
     { href: "/", icon: <DollarSign className="h-4 w-4" />, title: "Dashboard" },
     { href: "/transactions", icon: <Wallet className="h-4 w-4" />, title: "Transactions" },
+    { href: "/recurring-transactions", icon: <Repeat className="h-4 w-4" />, title: "Recurring" },
     { href: "/reports", icon: <BarChart4 className="h-4 w-4" />, title: "Reports" },
     { href: "/budgets", icon: <PieChart className="h-4 w-4" />, title: "Budgets" },
     { href: "/settings", icon: <Settings className="h-4 w-4" />, title: "Settings" }
