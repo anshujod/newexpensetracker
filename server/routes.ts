@@ -373,6 +373,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Recurring Transactions
+  
+  // Get all user recurring transactions
+  app.get("/api/recurring-transactions", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    
+    const userId = req.user!.id;
+    const recurringTransactions = await storage.getRecurringTransactions(userId);
+    res.json(recurringTransactions);
+  });
+  
+  // Get recurring transaction by ID
+  app.get("/api/recurring-transactions/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    
+    const recurringTransactionId = parseInt(req.params.id);
+    if (isNaN(recurringTransactionId)) return res.status(400).json({ message: "Invalid recurring transaction ID" });
+    
+    const recurringTransaction = await storage.getRecurringTransactionById(recurringTransactionId);
+    if (!recurringTransaction) return res.status(404).json({ message: "Recurring transaction not found" });
+    
+    // Check if recurring transaction belongs to requesting user
+    if (recurringTransaction.userId !== req.user!.id) 
+      return res.status(403).json({ message: "Access denied" });
+    
+    res.json(recurringTransaction);
+  });
+  
+  // Create new recurring transaction
+  app.post("/api/recurring-transactions", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    
+    try {
+      const userId = req.user!.id;
+      const recurringTransactionData = insertRecurringTransactionSchema.parse({
+        ...req.body,
+        userId
+      });
+      
+      // Validate that category exists and belongs to user
+      const category = await storage.getCategoryById(recurringTransactionData.categoryId);
+      if (!category) return res.status(400).json({ message: "Invalid category" });
+      if (category.userId !== userId && category.userId !== 0) 
+        return res.status(403).json({ message: "Access denied to this category" });
+      
+      // Set isActive to true by default if not provided
+      if (recurringTransactionData.isActive === undefined) {
+        recurringTransactionData.isActive = true;
+      }
+      
+      // Validate frequency-specific fields
+      switch (recurringTransactionData.frequency) {
+        case 'weekly':
+          if (recurringTransactionData.dayOfWeek === null || recurringTransactionData.dayOfWeek === undefined) {
+            return res.status(400).json({ message: "Day of week is required for weekly recurring transactions" });
+          }
+          if (recurringTransactionData.dayOfWeek < 0 || recurringTransactionData.dayOfWeek > 6) {
+            return res.status(400).json({ message: "Day of week must be between 0 (Sunday) and 6 (Saturday)" });
+          }
+          break;
+        case 'monthly':
+          if (recurringTransactionData.dayOfMonth === null || recurringTransactionData.dayOfMonth === undefined) {
+            return res.status(400).json({ message: "Day of month is required for monthly recurring transactions" });
+          }
+          if (recurringTransactionData.dayOfMonth < 1 || recurringTransactionData.dayOfMonth > 31) {
+            return res.status(400).json({ message: "Day of month must be between 1 and 31" });
+          }
+          break;
+      }
+      
+      const newRecurringTransaction = await storage.createRecurringTransaction(recurringTransactionData);
+      res.status(201).json(newRecurringTransaction);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid recurring transaction data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create recurring transaction" });
+    }
+  });
+  
+  // Update recurring transaction
+  app.put("/api/recurring-transactions/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    
+    const recurringTransactionId = parseInt(req.params.id);
+    if (isNaN(recurringTransactionId)) return res.status(400).json({ message: "Invalid recurring transaction ID" });
+    
+    const recurringTransaction = await storage.getRecurringTransactionById(recurringTransactionId);
+    if (!recurringTransaction) return res.status(404).json({ message: "Recurring transaction not found" });
+    
+    // Check if recurring transaction belongs to requesting user
+    if (recurringTransaction.userId !== req.user!.id) 
+      return res.status(403).json({ message: "Access denied" });
+    
+    try {
+      // Parse and validate update data
+      const updateFields = req.body;
+      
+      // If categoryId is provided, check if valid
+      if (updateFields.categoryId) {
+        const category = await storage.getCategoryById(updateFields.categoryId);
+        if (!category) return res.status(400).json({ message: "Invalid category" });
+        if (category.userId !== req.user!.id && category.userId !== 0) 
+          return res.status(403).json({ message: "Access denied to this category" });
+      }
+      
+      // Validate frequency-specific fields if frequency is being updated
+      if (updateFields.frequency) {
+        switch (updateFields.frequency) {
+          case 'weekly':
+            if (updateFields.dayOfWeek === null || updateFields.dayOfWeek === undefined) {
+              return res.status(400).json({ message: "Day of week is required for weekly recurring transactions" });
+            }
+            if (updateFields.dayOfWeek < 0 || updateFields.dayOfWeek > 6) {
+              return res.status(400).json({ message: "Day of week must be between 0 (Sunday) and 6 (Saturday)" });
+            }
+            break;
+          case 'monthly':
+            if (updateFields.dayOfMonth === null || updateFields.dayOfMonth === undefined) {
+              return res.status(400).json({ message: "Day of month is required for monthly recurring transactions" });
+            }
+            if (updateFields.dayOfMonth < 1 || updateFields.dayOfMonth > 31) {
+              return res.status(400).json({ message: "Day of month must be between 1 and 31" });
+            }
+            break;
+        }
+      }
+      
+      const updatedRecurringTransaction = await storage.updateRecurringTransaction(recurringTransactionId, updateFields);
+      res.json(updatedRecurringTransaction);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid recurring transaction data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update recurring transaction" });
+    }
+  });
+  
+  // Delete recurring transaction
+  app.delete("/api/recurring-transactions/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    
+    const recurringTransactionId = parseInt(req.params.id);
+    if (isNaN(recurringTransactionId)) return res.status(400).json({ message: "Invalid recurring transaction ID" });
+    
+    const recurringTransaction = await storage.getRecurringTransactionById(recurringTransactionId);
+    if (!recurringTransaction) return res.status(404).json({ message: "Recurring transaction not found" });
+    
+    // Check if recurring transaction belongs to requesting user
+    if (recurringTransaction.userId !== req.user!.id) 
+      return res.status(403).json({ message: "Access denied" });
+    
+    const success = await storage.deleteRecurringTransaction(recurringTransactionId);
+    if (success) {
+      res.status(204).send();
+    } else {
+      res.status(500).json({ message: "Failed to delete recurring transaction" });
+    }
+  });
+  
+  // Manually trigger processing of recurring transactions (admin feature)
+  app.post("/api/recurring-transactions/process", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    
+    try {
+      const numCreated = await storage.processRecurringTransactions();
+      res.json({ 
+        success: true, 
+        transactionsCreated: numCreated,
+        message: `Successfully processed recurring transactions (${numCreated} created)`
+      });
+    } catch (error) {
+      console.error("Error processing recurring transactions:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to process recurring transactions" 
+      });
+    }
+  });
+
   // Export functionalities
   
   // Helper function to generate CSV data
