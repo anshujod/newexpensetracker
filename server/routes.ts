@@ -1,9 +1,10 @@
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { insertTransactionSchema, insertCategorySchema, insertBudgetSchema } from "@shared/schema";
 import { z } from "zod";
+import { format } from 'date-fns';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -365,6 +366,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return b.month - a.month;
       })
     });
+  });
+
+  // Export functionalities
+  
+  // Helper function to generate CSV data
+  function generateCSV(data: any[], headers: string[]): string {
+    // Create CSV header
+    let csv = headers.join(',') + '\n';
+    
+    // Add rows
+    data.forEach(row => {
+      const values = headers.map(header => {
+        const value = row[header];
+        // Handle values with commas by wrapping in quotes
+        if (value && typeof value === 'string' && value.includes(',')) {
+          return `"${value}"`;
+        }
+        return value !== undefined && value !== null ? value : '';
+      });
+      csv += values.join(',') + '\n';
+    });
+    
+    return csv;
+  }
+
+  // Helper to set CSV response headers
+  function setCsvResponseHeaders(res: Response, filename: string): void {
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  }
+
+  // Export transactions as CSV
+  app.get("/api/export/transactions", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    
+    try {
+      const userId = req.user!.id;
+      const transactions = await storage.getTransactions(userId);
+      
+      // Get category information for each transaction
+      const transactionsWithCategories = await Promise.all(
+        transactions.map(async transaction => {
+          const category = await storage.getCategoryById(transaction.categoryId);
+          return {
+            id: transaction.id,
+            date: format(new Date(transaction.date), 'yyyy-MM-dd'),
+            type: transaction.type,
+            amount: transaction.amount,
+            description: transaction.description,
+            category: category?.name || 'Unknown',
+            notes: transaction.notes || ''
+          };
+        })
+      );
+      
+      const headers = ['id', 'date', 'type', 'amount', 'description', 'category', 'notes'];
+      const csv = generateCSV(transactionsWithCategories, headers);
+      
+      const currentDate = format(new Date(), 'yyyy-MM-dd');
+      setCsvResponseHeaders(res, `transactions_${currentDate}.csv`);
+      res.send(csv);
+    } catch (error) {
+      console.error("Error exporting transactions:", error);
+      res.status(500).json({ message: "Failed to export transactions" });
+    }
+  });
+
+  // Export monthly report as CSV
+  app.get("/api/export/monthly-report", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    
+    try {
+      const userId = req.user!.id;
+      const transactions = await storage.getTransactions(userId);
+      
+      // Group by month and category
+      const monthlyReport: any[] = [];
+      const monthlyData: Record<string, {
+        month: string,
+        year: number,
+        categories: Record<number, { 
+          income: number, 
+          expense: number, 
+          name: string 
+        }>
+      }> = {};
+      
+      // Get all categories
+      const allCategories = await storage.getCategories(userId);
+      const systemUser = await storage.getUserByUsername("system_default");
+      let defaultCategories: any[] = [];
+      if (systemUser) {
+        defaultCategories = await storage.getCategories(systemUser.id);
+      }
+      const categories = [...allCategories, ...defaultCategories];
+      
+      // Process transactions
+      for (const transaction of transactions) {
+        const date = new Date(transaction.date);
+        const monthYear = format(date, 'yyyy-MM');
+        const monthName = format(date, 'MMMM yyyy');
+        
+        if (!monthlyData[monthYear]) {
+          monthlyData[monthYear] = {
+            month: monthName,
+            year: date.getFullYear(),
+            categories: {}
+          };
+        }
+        
+        const categoryId = transaction.categoryId;
+        if (!monthlyData[monthYear].categories[categoryId]) {
+          const category = categories.find(c => c.id === categoryId);
+          monthlyData[monthYear].categories[categoryId] = {
+            income: 0,
+            expense: 0,
+            name: category?.name || 'Unknown'
+          };
+        }
+        
+        if (transaction.type === 'income') {
+          monthlyData[monthYear].categories[categoryId].income += transaction.amount;
+        } else {
+          monthlyData[monthYear].categories[categoryId].expense += transaction.amount;
+        }
+      }
+      
+      // Format into rows for CSV
+      Object.entries(monthlyData).forEach(([monthYear, data]) => {
+        Object.entries(data.categories).forEach(([categoryId, catData]) => {
+          monthlyReport.push({
+            month: data.month,
+            year: data.year,
+            category: catData.name,
+            income: catData.income,
+            expense: catData.expense,
+            net: catData.income - catData.expense
+          });
+        });
+      });
+      
+      const headers = ['month', 'year', 'category', 'income', 'expense', 'net'];
+      const csv = generateCSV(monthlyReport, headers);
+      
+      const currentDate = format(new Date(), 'yyyy-MM-dd');
+      setCsvResponseHeaders(res, `monthly_report_${currentDate}.csv`);
+      res.send(csv);
+    } catch (error) {
+      console.error("Error exporting monthly report:", error);
+      res.status(500).json({ message: "Failed to export monthly report" });
+    }
+  });
+
+  // Export yearly report as CSV
+  app.get("/api/export/yearly-report", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    
+    try {
+      const userId = req.user!.id;
+      const transactions = await storage.getTransactions(userId);
+      
+      // Group by year
+      const yearlyData: Record<number, {
+        income: number,
+        expense: number,
+        categories: Record<number, { 
+          income: number, 
+          expense: number,
+          name: string 
+        }>
+      }> = {};
+      
+      // Get all categories
+      const allCategories = await storage.getCategories(userId);
+      const systemUser = await storage.getUserByUsername("system_default");
+      let defaultCategories: any[] = [];
+      if (systemUser) {
+        defaultCategories = await storage.getCategories(systemUser.id);
+      }
+      const categories = [...allCategories, ...defaultCategories];
+      
+      // Process transactions
+      for (const transaction of transactions) {
+        const date = new Date(transaction.date);
+        const year = date.getFullYear();
+        
+        if (!yearlyData[year]) {
+          yearlyData[year] = {
+            income: 0,
+            expense: 0,
+            categories: {}
+          };
+        }
+        
+        const categoryId = transaction.categoryId;
+        if (!yearlyData[year].categories[categoryId]) {
+          const category = categories.find(c => c.id === categoryId);
+          yearlyData[year].categories[categoryId] = {
+            income: 0,
+            expense: 0,
+            name: category?.name || 'Unknown'
+          };
+        }
+        
+        if (transaction.type === 'income') {
+          yearlyData[year].income += transaction.amount;
+          yearlyData[year].categories[categoryId].income += transaction.amount;
+        } else {
+          yearlyData[year].expense += transaction.amount;
+          yearlyData[year].categories[categoryId].expense += transaction.amount;
+        }
+      }
+      
+      // Format into rows for CSV - yearly summary first
+      const yearlyReport: any[] = [];
+      
+      Object.entries(yearlyData).forEach(([year, data]) => {
+        yearlyReport.push({
+          year: parseInt(year),
+          category: 'TOTAL',
+          income: data.income,
+          expense: data.expense,
+          savings: data.income - data.expense,
+          savingsRate: data.income > 0 ? ((data.income - data.expense) / data.income * 100).toFixed(2) + '%' : '0%'
+        });
+        
+        // Then category breakdown for each year
+        Object.entries(data.categories).forEach(([categoryId, catData]) => {
+          yearlyReport.push({
+            year: parseInt(year),
+            category: catData.name,
+            income: catData.income,
+            expense: catData.expense,
+            net: catData.income - catData.expense,
+            percentOfTotal: data.expense > 0 && catData.expense > 0 
+              ? ((catData.expense / data.expense) * 100).toFixed(2) + '%' 
+              : '0%'
+          });
+        });
+      });
+      
+      const headers = ['year', 'category', 'income', 'expense', 'savings', 'savingsRate', 'net', 'percentOfTotal'];
+      const csv = generateCSV(yearlyReport, headers);
+      
+      const currentDate = format(new Date(), 'yyyy-MM-dd');
+      setCsvResponseHeaders(res, `yearly_report_${currentDate}.csv`);
+      res.send(csv);
+    } catch (error) {
+      console.error("Error exporting yearly report:", error);
+      res.status(500).json({ message: "Failed to export yearly report" });
+    }
   });
 
   const httpServer = createServer(app);

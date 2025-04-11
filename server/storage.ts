@@ -1,4 +1,4 @@
-import { users, type User, type InsertUser, categories, type Category, type InsertCategory, transactions, type Transaction, type InsertTransaction, budgets, type Budget, type InsertBudget } from "@shared/schema";
+import { users, type User, type InsertUser, categories, type Category, type InsertCategory, transactions, type Transaction, type InsertTransaction, budgets, type Budget, type InsertBudget, recurringTransactions, type RecurringTransaction, type InsertRecurringTransaction } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import { Store } from "express-session";

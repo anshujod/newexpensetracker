@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, date, timestamp, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, date, timestamp, doublePrecision, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -48,6 +48,25 @@ export const budgets = pgTable("budgets", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Recurring Transactions table
+export const recurringTransactions = pgTable("recurring_transactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  type: text("type").notNull(), // 'income' or 'expense'
+  amount: doublePrecision("amount").notNull(),
+  description: text("description").notNull(),
+  categoryId: integer("category_id").references(() => categories.id).notNull(),
+  frequency: text("frequency").notNull(), // 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"), // Optional end date
+  dayOfMonth: integer("day_of_month"), // For monthly recurring (1-31)
+  dayOfWeek: integer("day_of_week"), // For weekly recurring (0-6)
+  lastProcessedDate: date("last_processed_date"), // Last date when a transaction was generated
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Schema for user insertion
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -71,6 +90,13 @@ export const insertBudgetSchema = createInsertSchema(budgets).omit({
   createdAt: true,
 });
 
+// Schema for recurring transaction insertion
+export const insertRecurringTransactionSchema = createInsertSchema(recurringTransactions).omit({
+  id: true,
+  createdAt: true,
+  lastProcessedDate: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -83,3 +109,6 @@ export type Transaction = typeof transactions.$inferSelect;
 
 export type InsertBudget = z.infer<typeof insertBudgetSchema>;
 export type Budget = typeof budgets.$inferSelect;
+
+export type InsertRecurringTransaction = z.infer<typeof insertRecurringTransactionSchema>;
+export type RecurringTransaction = typeof recurringTransactions.$inferSelect;
