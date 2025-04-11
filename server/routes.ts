@@ -2,7 +2,12 @@ import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { insertTransactionSchema, insertCategorySchema, insertBudgetSchema } from "@shared/schema";
+import { 
+  insertTransactionSchema, 
+  insertCategorySchema, 
+  insertBudgetSchema,
+  insertRecurringTransactionSchema
+} from "@shared/schema";
 import { z } from "zod";
 import { format } from 'date-fns';
 
