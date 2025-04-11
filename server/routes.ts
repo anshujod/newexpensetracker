@@ -12,6 +12,14 @@ import {
 import { z } from "zod";
 import { format } from 'date-fns';
 
+// Define type for monthly data structure used in summary
+type MonthlySummary = {
+  month: number;
+  year: number;
+  income: number;
+  expenses: number;
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
   setupAuth(app);
@@ -357,16 +365,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         acc[key].expenses += t.amount;
       }
-      
+
       return acc;
-    }, {} as Record<string, {month: number, year: number, income: number, expenses: number}>);
-    
+    }, {} as Record<string, MonthlySummary>); // Use MonthlySummary type for accumulator
+
     res.json({
       totalIncome,
       totalExpenses,
       balance,
       expensesByCategory,
-      monthlyData: Object.values(monthlyData).sort((a: { year: number; month: number }, b: { year: number; month: number }) => { // Added explicit types for a and b
+      monthlyData: (Object.values(monthlyData) as MonthlySummary[]).sort((a, b) => { // Cast to MonthlySummary[] and remove explicit types from sort
         // Sort by year and month (descending)
         if (a.year !== b.year) return b.year - a.year;
         return b.month - a.month;
