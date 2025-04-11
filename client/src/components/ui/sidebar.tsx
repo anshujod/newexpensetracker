@@ -16,22 +16,27 @@ interface NavItemProps {
   onClick?: () => void;
 }
 
-const NavItem = ({ href, icon, title, active, onClick }: NavItemProps) => (
-  <li>
-    <Link href={href}>
-      <a
-        onClick={onClick}
+const NavItem = ({ href, icon, title, active, onClick }: NavItemProps) => {
+  const navigate = useLocation()[1];
+  
+  return (
+    <li>
+      <div
+        onClick={() => {
+          onClick?.();
+          navigate(href);
+        }}
         className={cn(
-          "flex items-center gap-2 px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/30 rounded-md",
+          "flex items-center gap-2 px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/30 rounded-md cursor-pointer",
           active && "text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-slate-700/50"
         )}
       >
         {icon}
         <span>{title}</span>
-      </a>
-    </Link>
-  </li>
-);
+      </div>
+    </li>
+  );
+};
 
 export function Sidebar() {
   const [location] = useLocation();

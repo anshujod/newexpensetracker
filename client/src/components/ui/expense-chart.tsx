@@ -1,10 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { Transaction, Category } from '@shared/schema';
 import { useTheme } from '@/hooks/use-theme';
-import { Chart, ArcElement, Tooltip, Legend } from 'chart.js';
-import { Skeleton } from './skeleton';
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+  DoughnutController,
+} from 'chart.js';
 
-Chart.register(ArcElement, Tooltip, Legend);
+ChartJS.register(DoughnutController, ArcElement, Tooltip, Legend);
 
 interface ExpenseChartProps {
   transactions: Transaction[];
@@ -13,7 +18,7 @@ interface ExpenseChartProps {
 
 export default function ExpenseChart({ transactions, categories }: ExpenseChartProps) {
   const chartRef = useRef<HTMLCanvasElement>(null);
-  const chartInstance = useRef<Chart | null>(null);
+  const chartInstance = useRef<ChartJS | null>(null);
   const { theme } = useTheme();
   
   // Process transactions data
@@ -73,7 +78,7 @@ export default function ExpenseChart({ transactions, categories }: ExpenseChartP
     const textColor = theme === 'dark' ? '#e2e8f0' : '#475569';
     
     // Create new chart
-    chartInstance.current = new Chart(ctx, {
+    chartInstance.current = new ChartJS(ctx, {
       type: 'doughnut',
       data: {
         labels: categoryNames,
@@ -96,7 +101,7 @@ export default function ExpenseChart({ transactions, categories }: ExpenseChartP
           },
           tooltip: {
             callbacks: {
-              label: function(context) {
+              label: function(context: any) {
                 const value = context.parsed;
                 const percentage = ((value / totalExpense) * 100).toFixed(1);
                 return `${context.label}: $${value.toFixed(2)} (${percentage}%)`;

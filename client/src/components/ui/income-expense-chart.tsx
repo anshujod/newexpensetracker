@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useTheme } from '@/hooks/use-theme';
-import { Chart, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { Chart, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, BarController } from 'chart.js';
 import { format, isAfter, isBefore, subMonths } from 'date-fns';
 
-Chart.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+Chart.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, BarController);
 
 interface MonthlyData {
   month: number;
@@ -131,10 +131,11 @@ export default function IncomeExpenseChart({ monthlyData }: IncomeExpenseChartPr
             },
             ticks: {
               color: textColor,
-              callback: function(value) {
-                if (value === 0) return '$0';
-                if (value >= 1000) return `$${value / 1000}k`;
-                return `$${value}`;
+              callback: function(value: number | string) {
+                const numValue = Number(value);
+                if (numValue === 0) return '$0';
+                if (numValue >= 1000) return `$${numValue / 1000}k`;
+                return `$${numValue}`;
               }
             }
           }
@@ -159,8 +160,8 @@ export default function IncomeExpenseChart({ monthlyData }: IncomeExpenseChartPr
   }
   
   return (
-    <div className="h-full">
-      <div className="chart-container h-full">
+    <div className="h-[300px] relative">
+      <div className="absolute inset-0">
         <canvas ref={chartRef}></canvas>
       </div>
     </div>
