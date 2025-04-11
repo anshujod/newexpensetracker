@@ -50,11 +50,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (user: User) => {
+      // Update the cache with the user data
       queryClient.setQueryData(["/api/user"], user);
+      
+      // Invalidate and refetch the user query to trigger any hooks
+      // This helps ensure all components have the latest user state
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      
       toast({
         title: "Login successful",
         description: `Welcome back, ${user.username}!`,
       });
+      
+      // Force navigation to dashboard after a short delay to allow for state updates
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 500);
     },
     onError: (error: Error) => {
       toast({
@@ -71,11 +82,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (user: User) => {
+      // Update the cache with the user data
       queryClient.setQueryData(["/api/user"], user);
+      
+      // Invalidate and refetch the user query to trigger any hooks
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      
       toast({
         title: "Registration successful",
         description: `Welcome, ${user.username}!`,
       });
+      
+      // Force navigation to dashboard after a short delay to allow for state updates
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 500);
     },
     onError: (error: Error) => {
       toast({
@@ -91,11 +112,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
+      // Update the cache
       queryClient.setQueryData(["/api/user"], null);
+      
+      // Invalidate and refetch the user query
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      
       toast({
         title: "Logged out",
         description: "You have been successfully logged out.",
       });
+      
+      // Redirect to auth page
+      setTimeout(() => {
+        window.location.href = '/auth';
+      }, 500);
     },
     onError: (error: Error) => {
       toast({
