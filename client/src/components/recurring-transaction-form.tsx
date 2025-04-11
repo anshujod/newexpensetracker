@@ -85,12 +85,19 @@ export default function RecurringTransactionForm({
     resolver: zodResolver(recurringTransactionFormSchema),
     defaultValues: editRecurringTransaction
       ? {
-          ...editRecurringTransaction,
+          type: editRecurringTransaction.type as "income" | "expense",
+          amount: editRecurringTransaction.amount,
+          description: editRecurringTransaction.description,
+          categoryId: editRecurringTransaction.categoryId,
           startDate: new Date(editRecurringTransaction.startDate),
           endDate: editRecurringTransaction.endDate
             ? new Date(editRecurringTransaction.endDate)
             : null,
-          amount: editRecurringTransaction.amount,
+          frequency: editRecurringTransaction.frequency as "daily" | "weekly" | "monthly" | "yearly",
+          dayOfWeek: editRecurringTransaction.dayOfWeek,
+          dayOfMonth: editRecurringTransaction.dayOfMonth,
+          notes: editRecurringTransaction.notes || "",
+          isActive: editRecurringTransaction.isActive
         }
       : {
           type: "expense",

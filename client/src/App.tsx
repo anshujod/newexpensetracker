@@ -7,6 +7,7 @@ import Transactions from "@/pages/transactions";
 import Reports from "@/pages/reports";
 import Budgets from "@/pages/budgets";
 import Settings from "@/pages/settings";
+import RecurringTransactions from "@/pages/recurring-transactions";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 
@@ -15,6 +16,7 @@ function Router() {
     <Switch>
       <ProtectedRoute path="/" component={Dashboard} />
       <ProtectedRoute path="/transactions" component={Transactions} />
+      <ProtectedRoute path="/recurring-transactions" component={RecurringTransactions} />
       <ProtectedRoute path="/reports" component={Reports} />
       <ProtectedRoute path="/budgets" component={Budgets} />
       <ProtectedRoute path="/settings" component={Settings} />

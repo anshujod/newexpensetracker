@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { Helmet } from "react-helmet";
 import { Loader2 } from "lucide-react";
 import RecurringTransactionList from "@/components/recurring-transaction-list";
 import { Category, RecurringTransaction } from "@shared/schema";
@@ -45,10 +44,6 @@ export default function RecurringTransactionsPage() {
 
   return (
     <>
-      <Helmet>
-        <title>Recurring Transactions | Financial Tracker</title>
-      </Helmet>
-
       <div className="container max-w-5xl mx-auto px-4 py-8">
         {isLoading ? (
           <div className="flex justify-center items-center py-20">
