@@ -1,28 +1,20 @@
 {
   "version": 2,
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/server/index.ts" },
-    { "source": "/(.*)", "destination": "/client/dist/$1" }
-  ],
   "builds": [
+    {
+      "src": "server/index.ts",
+      "use": "@vercel/node",
+      "config": { "runtime": "nodejs20.x" }
+    },
     {
       "src": "client/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "buildCommand": "npm run build",
-        "outputDirectory": "dist"
-      }
-    },
-    {
-      "src": "server/package.json",
-      "use": "@vercel/node",
-      "config": {
-        "runtime": "nodejs20.x",
-        "entrypoint": "index.ts"
+        "distDir": "dist"
       }
     }
   ],
-  "installCommand": "npm install",
-  "buildCommand": "npm run build",
-  "outputDirectory": "client/dist"
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/server/index.ts" }
+  ]
 }
