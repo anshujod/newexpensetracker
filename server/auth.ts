@@ -5,8 +5,9 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User as SelectUser, insertUserSchema } from "@shared/schema";
+import { User as SelectUser, insertUserSchema, Category } from "@shared/schema";
 import { z } from "zod";
+import { db } from "./db";
 
 declare global {
   namespace Express {
@@ -15,6 +16,45 @@ declare global {
 }
 
 const scryptAsync = promisify(scrypt);
+
+// Helper function to copy default categories for a new user
+async function copyDefaultCategoriesForNewUser(userId: number): Promise<void> {
+  try {
+    // Find the system user (created in DatabaseStorage seedDefaultCategories)
+    const systemUser = await storage.getUserByUsername("system_default");
+    
+    if (!systemUser) {
+      console.error("System user not found for default categories");
+      return;
+    }
+    
+    // Get all default categories from system user
+    const defaultCategories = await storage.getCategories(systemUser.id);
+    
+    if (defaultCategories.length === 0) {
+      console.error("No default categories found");
+      return;
+    }
+    
+    // Create copies of these categories for the new user
+    const categoriesToCreate = defaultCategories.map(category => ({
+      name: category.name,
+      icon: category.icon,
+      color: category.color,
+      type: category.type,
+      userId: userId
+    }));
+    
+    // Insert all categories for the new user
+    for (const category of categoriesToCreate) {
+      await storage.createCategory(category);
+    }
+    
+    console.log(`Created ${categoriesToCreate.length} default categories for user ${userId}`);
+  } catch (error) {
+    console.error("Error copying default categories:", error);
+  }
+}
 
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -96,6 +136,9 @@ export function setupAuth(app: Express) {
         password: hashedPassword,
       });
 
+      // Create default categories for the new user
+      await copyDefaultCategoriesForNewUser(user.id);
+      
       // Auto-login after registration
       req.login(user, (err) => {
         if (err) return next(err);
@@ -116,22 +159,25 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user, info) => {
+    passport.authenticate("local", (err: any, user: SelectUser | false, info: { message?: string }) => {
       if (err) return next(err);
       if (!user) {
         return res.status(401).json({ message: info?.message || "Invalid username or password" });
       }
-      req.login(user, (err) => {
+      req.login(user, (err: any) => {
         if (err) return next(err);
-        // Return user without password
-        const { password, ...userWithoutPassword } = user;
-        res.status(200).json(userWithoutPassword);
+        
+        if (user) {
+          // Return user without password
+          const { password, ...userWithoutPassword } = user as SelectUser;
+          res.status(200).json(userWithoutPassword);
+        }
       });
     })(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {
-    req.logout((err) => {
+    req.logout((err: any) => {
       if (err) return next(err);
       res.sendStatus(200);
     });
