@@ -17,6 +17,6 @@
     },
     "allowJs": true
   },
-  "include": ["server/**/*", "shared/**/*"], // Include both server and shared
-  "exclude": ["node_modules", "dist", "server/vite.ts"] // Exclude vite integration file
+  "include": ["../server/**/*", "../shared/**/*"], // Paths relative to tsconfig location
+  "exclude": ["node_modules", "dist", "../server/vite.ts"] // Exclude vite integration file
 }
