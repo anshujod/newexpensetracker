@@ -101,7 +101,7 @@ export function setupAuth(app: Express) {
     }),
   );
 
-  passport.serializeUser((user, done) => done(null, user.id));
+  passport.serializeUser((user, done) => done(null, (user as SelectUser).id)); // Use SelectUser alias
   passport.deserializeUser(async (id: number, done) => {
     try {
       const user = await storage.getUser(id);

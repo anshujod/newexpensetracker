@@ -366,7 +366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       totalExpenses,
       balance,
       expensesByCategory,
-      monthlyData: Object.values(monthlyData).sort((a, b) => {
+      monthlyData: Object.values(monthlyData).sort((a: { year: number; month: number }, b: { year: number; month: number }) => { // Added explicit types for a and b
         // Sort by year and month (descending)
         if (a.year !== b.year) return b.year - a.year;
         return b.month - a.month;
