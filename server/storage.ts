@@ -154,8 +154,15 @@ export class MemStorage implements IStorage {
     
     // If date is a Date object, convert it to string
     let dateStr = transaction.date;
-    if (typeof transaction.date === 'object' && transaction.date && 'toISOString' in transaction.date) {
-      dateStr = transaction.date.toISOString().split('T')[0];
+    if (typeof transaction.date === 'object' && transaction.date) {
+      try {
+        const dateObj = transaction.date as Date;
+        if (typeof dateObj.toISOString === 'function') {
+          dateStr = dateObj.toISOString().split('T')[0];
+        }
+      } catch (error) {
+        console.error("Error converting date:", error);
+      }
     }
     
     const newTransaction: Transaction = { 

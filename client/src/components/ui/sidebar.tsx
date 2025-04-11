@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import ThemeToggle from "@/components/theme-toggle";
-import { Menu, DollarSign, BarChart4, PieChart, Wallet, Settings } from "lucide-react";
+import { Menu, DollarSign, BarChart4, PieChart, Wallet, Settings, Repeat } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";

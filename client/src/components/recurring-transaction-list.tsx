@@ -152,7 +152,7 @@ export default function RecurringTransactionList({
   };
 
   // Function to get badge variant based on transaction type
-  const getBadgeVariant = (type: "income" | "expense"): "default" | "secondary" => {
+  const getBadgeVariant = (type: string): "default" | "secondary" => {
     return type === "income" ? "default" : "secondary";
   };
 
