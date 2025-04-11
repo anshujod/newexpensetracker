@@ -37,6 +37,14 @@ export interface IStorage {
   updateBudget(id: number, budget: Partial<InsertBudget>): Promise<Budget | undefined>;
   deleteBudget(id: number): Promise<boolean>;
   
+  // Recurring Transaction methods
+  getRecurringTransactions(userId: number): Promise<RecurringTransaction[]>;
+  getRecurringTransactionById(id: number): Promise<RecurringTransaction | undefined>;
+  createRecurringTransaction(recurringTransaction: InsertRecurringTransaction): Promise<RecurringTransaction>;
+  updateRecurringTransaction(id: number, recurringTransaction: Partial<InsertRecurringTransaction>): Promise<RecurringTransaction | undefined>;
+  deleteRecurringTransaction(id: number): Promise<boolean>;
+  processRecurringTransactions(): Promise<number>; // Returns number of transactions created
+  
   // Session store
   sessionStore: Store;
 }
@@ -46,10 +54,12 @@ export class MemStorage implements IStorage {
   private categories: Map<number, Category>;
   private transactions: Map<number, Transaction>;
   private budgets: Map<number, Budget>;
+  private recurringTransactions: Map<number, RecurringTransaction>;
   private currentUserId: number;
   private currentCategoryId: number;
   private currentTransactionId: number;
   private currentBudgetId: number;
+  private currentRecurringTransactionId: number;
   sessionStore: Store;
 
   constructor() {
@@ -57,10 +67,12 @@ export class MemStorage implements IStorage {
     this.categories = new Map();
     this.transactions = new Map();
     this.budgets = new Map();
+    this.recurringTransactions = new Map();
     this.currentUserId = 1;
     this.currentCategoryId = 1;
     this.currentTransactionId = 1;
     this.currentBudgetId = 1;
+    this.currentRecurringTransactionId = 1;
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000 // 24 hours
     });
@@ -139,10 +151,18 @@ export class MemStorage implements IStorage {
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
     const id = this.currentTransactionId++;
     const createdAt = new Date();
+    
+    // If date is a Date object, convert it to string
+    let dateStr = transaction.date;
+    if (transaction.date instanceof Date) {
+      dateStr = transaction.date.toISOString().split('T')[0];
+    }
+    
     const newTransaction: Transaction = { 
       ...transaction, 
       id, 
       createdAt,
+      date: dateStr,
       notes: transaction.notes || null
     };
     this.transactions.set(id, newTransaction);
@@ -192,6 +212,128 @@ export class MemStorage implements IStorage {
 
   async deleteBudget(id: number): Promise<boolean> {
     return this.budgets.delete(id);
+  }
+
+  // Recurring Transaction methods
+  async getRecurringTransactions(userId: number): Promise<RecurringTransaction[]> {
+    return Array.from(this.recurringTransactions.values()).filter(
+      (recurringTransaction) => recurringTransaction.userId === userId
+    );
+  }
+
+  async getRecurringTransactionById(id: number): Promise<RecurringTransaction | undefined> {
+    return this.recurringTransactions.get(id);
+  }
+
+  async createRecurringTransaction(recurringTransaction: InsertRecurringTransaction): Promise<RecurringTransaction> {
+    const id = this.currentRecurringTransactionId++;
+    const createdAt = new Date();
+    const newRecurringTransaction: RecurringTransaction = { 
+      ...recurringTransaction, 
+      id, 
+      createdAt,
+      lastProcessedDate: null,
+      notes: recurringTransaction.notes || null,
+      endDate: recurringTransaction.endDate || null,
+      dayOfMonth: recurringTransaction.dayOfMonth || null,
+      dayOfWeek: recurringTransaction.dayOfWeek || null,
+      isActive: recurringTransaction.isActive !== undefined ? recurringTransaction.isActive : true
+    };
+    this.recurringTransactions.set(id, newRecurringTransaction);
+    return newRecurringTransaction;
+  }
+
+  async updateRecurringTransaction(id: number, recurringTransactionUpdate: Partial<InsertRecurringTransaction>): Promise<RecurringTransaction | undefined> {
+    const recurringTransaction = this.recurringTransactions.get(id);
+    if (!recurringTransaction) return undefined;
+    
+    const updatedRecurringTransaction = { ...recurringTransaction, ...recurringTransactionUpdate };
+    this.recurringTransactions.set(id, updatedRecurringTransaction);
+    return updatedRecurringTransaction;
+  }
+
+  async deleteRecurringTransaction(id: number): Promise<boolean> {
+    return this.recurringTransactions.delete(id);
+  }
+
+  async processRecurringTransactions(): Promise<number> {
+    // This is a simplified version for the memory implementation
+    // In a real implementation, we would handle all frequencies properly
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // normalize to start of day for date comparisons
+    let transactionsCreated = 0;
+    
+    const allRecurringTransactions = Array.from(this.recurringTransactions.values())
+      .filter(rt => rt.isActive);
+      
+    for (const rt of allRecurringTransactions) {
+      // Skip if already processed today
+      if (rt.lastProcessedDate && 
+          new Date(rt.lastProcessedDate).toDateString() === today.toDateString()) {
+        continue;
+      }
+      
+      // Skip if end date is in the past
+      if (rt.endDate && new Date(rt.endDate) < today) {
+        continue;
+      }
+      
+      // Skip if start date is in the future
+      if (new Date(rt.startDate) > today) {
+        continue;
+      }
+      
+      // Check if we should process this recurring transaction today
+      let shouldProcess = false;
+      switch (rt.frequency) {
+        case 'daily':
+          shouldProcess = true;
+          break;
+        case 'weekly':
+          if (rt.dayOfWeek !== null && rt.dayOfWeek === today.getDay()) {
+            shouldProcess = true;
+          }
+          break;
+        case 'monthly':
+          if (rt.dayOfMonth !== null && rt.dayOfMonth === today.getDate()) {
+            shouldProcess = true;
+          }
+          break;
+        case 'yearly':
+          const startDate = new Date(rt.startDate);
+          if (startDate.getDate() === today.getDate() && 
+              startDate.getMonth() === today.getMonth()) {
+            shouldProcess = true;
+          }
+          break;
+      }
+      
+      if (shouldProcess) {
+        // Format the date as 'YYYY-MM-DD' for storage
+        const formattedDate = today.toISOString().split('T')[0];
+        
+        // Create a new transaction based on the recurring transaction
+        const transaction: InsertTransaction = {
+          userId: rt.userId,
+          type: rt.type,
+          amount: rt.amount,
+          description: rt.description,
+          date: formattedDate,
+          categoryId: rt.categoryId,
+          notes: rt.notes
+        };
+        
+        await this.createTransaction(transaction);
+        
+        // Update last processed date with formatted date string
+        const updatedRt = { ...rt, lastProcessedDate: formattedDate };
+        this.recurringTransactions.set(rt.id, updatedRt);
+        
+        transactionsCreated++;
+      }
+    }
+    
+    return transactionsCreated;
   }
 
   // Helper method to seed default categories
@@ -353,6 +495,136 @@ export class DatabaseStorage implements IStorage {
   async deleteBudget(id: number): Promise<boolean> {
     const result = await db.delete(budgets).where(eq(budgets.id, id));
     return !!result;
+  }
+
+  // Recurring Transaction methods
+  async getRecurringTransactions(userId: number): Promise<RecurringTransaction[]> {
+    return db.select()
+      .from(recurringTransactions)
+      .where(eq(recurringTransactions.userId, userId))
+      .orderBy(desc(recurringTransactions.createdAt));
+  }
+
+  async getRecurringTransactionById(id: number): Promise<RecurringTransaction | undefined> {
+    const result = await db.select().from(recurringTransactions).where(eq(recurringTransactions.id, id));
+    return result[0];
+  }
+
+  async createRecurringTransaction(recurringTx: InsertRecurringTransaction): Promise<RecurringTransaction> {
+    const result = await db.insert(recurringTransactions).values({
+      ...recurringTx,
+      createdAt: new Date(),
+      lastProcessedDate: null,
+      notes: recurringTx.notes || null,
+      endDate: recurringTx.endDate || null,
+      dayOfMonth: recurringTx.dayOfMonth || null,
+      dayOfWeek: recurringTx.dayOfWeek || null,
+      isActive: recurringTx.isActive !== undefined ? recurringTx.isActive : true
+    }).returning();
+    
+    return result[0];
+  }
+
+  async updateRecurringTransaction(id: number, recurringTxUpdate: Partial<InsertRecurringTransaction>): Promise<RecurringTransaction | undefined> {
+    const result = await db.update(recurringTransactions)
+      .set(recurringTxUpdate)
+      .where(eq(recurringTransactions.id, id))
+      .returning();
+    
+    return result[0];
+  }
+
+  async deleteRecurringTransaction(id: number): Promise<boolean> {
+    const result = await db.delete(recurringTransactions).where(eq(recurringTransactions.id, id));
+    return !!result;
+  }
+
+  async processRecurringTransactions(): Promise<number> {
+    // Get all active recurring transactions
+    const allRecurringTxs = await db.select()
+      .from(recurringTransactions)
+      .where(eq(recurringTransactions.isActive, true));
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // normalize to start of day for date comparisons
+    let transactionsCreated = 0;
+    
+    for (const rt of allRecurringTxs) {
+      try {
+        // Skip if already processed today
+        if (rt.lastProcessedDate) {
+          const lastProcessed = new Date(rt.lastProcessedDate);
+          lastProcessed.setHours(0, 0, 0, 0);
+          if (lastProcessed.getTime() === today.getTime()) {
+            continue;
+          }
+        }
+        
+        // Skip if end date is in the past
+        if (rt.endDate && new Date(rt.endDate) < today) {
+          continue;
+        }
+        
+        // Skip if start date is in the future
+        if (new Date(rt.startDate) > today) {
+          continue;
+        }
+        
+        // Check if we should process this recurring transaction today
+        let shouldProcess = false;
+        switch (rt.frequency) {
+          case 'daily':
+            shouldProcess = true;
+            break;
+          case 'weekly':
+            if (rt.dayOfWeek !== null && rt.dayOfWeek === today.getDay()) {
+              shouldProcess = true;
+            }
+            break;
+          case 'monthly':
+            if (rt.dayOfMonth !== null && rt.dayOfMonth === today.getDate()) {
+              shouldProcess = true;
+            }
+            break;
+          case 'yearly':
+            const startDate = new Date(rt.startDate);
+            if (startDate.getDate() === today.getDate() && 
+                startDate.getMonth() === today.getMonth()) {
+              shouldProcess = true;
+            }
+            break;
+        }
+        
+        if (shouldProcess) {
+          // Format the date as 'YYYY-MM-DD' for PostgreSQL
+          const formattedDate = today.toISOString().split('T')[0];
+          
+          // Create a transaction
+          const transaction: InsertTransaction = {
+            userId: rt.userId,
+            type: rt.type,
+            amount: rt.amount,
+            description: rt.description,
+            date: formattedDate,
+            categoryId: rt.categoryId,
+            notes: rt.notes
+          };
+          
+          await this.createTransaction(transaction);
+          
+          // Update last processed date - format as 'YYYY-MM-DD' for PostgreSQL
+          await db.update(recurringTransactions)
+            .set({ lastProcessedDate: formattedDate })
+            .where(eq(recurringTransactions.id, rt.id));
+          
+          transactionsCreated++;
+        }
+      } catch (error) {
+        console.error(`Error processing recurring transaction ${rt.id}:`, error);
+      }
+    }
+    
+    return transactionsCreated;
   }
   
   // Helper method to seed default categories (only call this once)
